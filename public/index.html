@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRUD — Cadastro</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui; background:#0f1117; color:#e8eaf0; min-height:100vh; }
+    header { background:#1a1f2e; border-bottom:1px solid #2a3040; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { font-size:18px; font-weight:700; color:#4f8ef7; }
+    .container { max-width:800px; margin:0 auto; padding:20px; }
+    .btn { padding:10px 20px; border-radius:10px; border:none; cursor:pointer; font-size:14px; font-weight:600; transition:all .2s; }
+    .btn-primary { background:#4f8ef7; color:#fff; }
+    .btn-danger { background:#ef4444; color:#fff; }
+    .btn-sm { padding:6px 12px; font-size:12px; }
+    input, select, textarea { width:100%; padding:10px 12px; background:#1e2540; border:1px solid #2a3040; border-radius:10px; color:#e8eaf0; font-size:14px; margin-bottom:10px; outline:none; }
+    input:focus, select:focus, textarea:focus { border-color:#4f8ef7; }
+    .card { background:#1a1f2e; border:1px solid #2a3040; border-radius:14px; padding:20px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:flex-start; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; }
+    .modal.open { display:flex; }
+    .modal-box { background:#1a1f2e; border-radius:20px; padding:24px; width:90%; max-width:440px; }
+    .badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; background:#4f8ef720; color:#4f8ef7; }
+    .search-row { display:flex; gap:10px; margin-bottom:16px; }
+    .search-row input { margin:0; }
+    .search-row select { margin:0; width:140px; flex-shrink:0; }
+    #vazio { text-align:center; padding:60px 0; color:#555; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📋 Cadastro</h1>
+    <button class="btn btn-primary btn-sm" onclick="abrirModal()">+ Novo</button>
+  </header>
+  <div class="container">
+    <div class="search-row">
+      <input id="busca" type="search" placeholder="🔍 Buscar por nome ou email..." oninput="listar()">
+      <select id="filtro" onchange="listar()"><option value="">Todas categorias</option><option>cliente</option><option>fornecedor</option><option>geral</option></select>
+    </div>
+    <div id="lista"></div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <h2 id="modal-titulo" style="margin-bottom:16px;font-size:16px">Novo Registro</h2>
+      <input id="f-nome" placeholder="Nome *" />
+      <input id="f-email" type="email" placeholder="Email" />
+      <input id="f-telefone" placeholder="Telefone" />
+      <select id="f-categoria"><option>geral</option><option>cliente</option><option>fornecedor</option></select>
+      <textarea id="f-obs" rows="2" placeholder="Observações" style="resize:none"></textarea>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="salvar()">Salvar</button>
+        <button class="btn" style="background:#2a3040;flex:1" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let editId = null;
+    async function listar() {
+      const busca = document.getElementById('busca').value;
+      const cat = document.getElementById('filtro').value;
+      const r = await fetch('/api/registros?busca='+encodeURIComponent(busca)+'&categoria='+encodeURIComponent(cat));
+      const data = await r.json();
+      const el = document.getElementById('lista');
+      if (!data.length) { el.innerHTML = '<div id="vazio">Nenhum registro encontrado</div>'; return; }
+      el.innerHTML = data.map(d => `
+        <div class="card">
+          <div>
+            <div style="font-size:15px;font-weight:700;margin-bottom:4px">${d.nome}</div>
+            <div style="color:#888;font-size:12px">${d.email||''} ${d.telefone ? '· '+d.telefone : ''}</div>
+            ${d.observacoes ? '<div style="color:#666;font-size:12px;margin-top:4px">'+d.observacoes+'</div>' : ''}
+            <span class="badge" style="margin-top:8px;display:inline-block">${d.categoria}</span>
+          </div>
+          <div style="display:flex;gap:8px;shrink:0">
+            <button class="btn btn-sm" style="background:#2a3040" onclick="editar(${d.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="excluir(${d.id})">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    function abrirModal(dados) {
+      editId = dados?.id || null;
+      document.getElementById('modal-titulo').textContent = editId ? 'Editar Registro' : 'Novo Registro';
+      document.getElementById('f-nome').value = dados?.nome||'';
+      document.getElementById('f-email').value = dados?.email||'';
+      document.getElementById('f-telefone').value = dados?.telefone||'';
+      document.getElementById('f-categoria').value = dados?.categoria||'geral';
+      document.getElementById('f-obs').value = dados?.observacoes||'';
+      document.getElementById('modal').classList.add('open');
+    }
+    function fecharModal() { document.getElementById('modal').classList.remove('open'); }
+    async function editar(id) { const r = await fetch('/api/registros/'+id); abrirModal(await r.json()); }
+    async function salvar() {
+      const body = { nome:document.getElementById('f-nome').value, email:document.getElementById('f-email').value, telefone:document.getElementById('f-telefone').value, categoria:document.getElementById('f-categoria').value, observacoes:document.getElementById('f-obs').value };
+      await fetch('/api/registros'+(editId?'/'+editId:''), { method: editId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      fecharModal(); listar();
+    }
+    async function excluir(id) {
+      if (!confirm('Remover este registro?')) return;
+      await fetch('/api/registros/'+id, { method:'DELETE' });
+      listar();
+    }
+    listar();
+  </script>
+</body>
+</html>
